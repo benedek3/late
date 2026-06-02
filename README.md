@@ -1,0 +1,30 @@
+# Late
+
+Late is a lightweight native macOS menu bar AI workspace.
+
+## Run
+
+```sh
+swift run
+```
+
+The app runs as a menu bar accessory with no Dock icon and opens a centered floating workspace window.
+
+## Setup
+
+On first launch, Late asks for an OpenRouter API key and stores it in macOS Keychain under `dev.late.openrouter`.
+
+After setup:
+
+- Click `Late` in the macOS menu bar to open the workspace.
+- Press `Option+Tab` to toggle it globally.
+- Press `Escape` to hide the workspace.
+- Press `Command+B` to show or hide history.
+- Use `Settings` to update the OpenRouter key or change the appearance shortcut.
+- Toggle `Web` in the prompt bar to enable OpenRouter web search for the next request.
+- Start a new chat without deleting the current one.
+- Saved chats are stored on device at `~/Library/Application Support/Late/chats.json`.
+- Pick a model from the selector at the top of the panel.
+- Send prompts with `Command+Return`.
+
+All model requests go through OpenRouter at `https://openrouter.ai/api/v1/chat/completions`.

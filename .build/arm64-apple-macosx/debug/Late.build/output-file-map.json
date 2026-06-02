@@ -1,0 +1,61 @@
+{
+  "": {
+    "swift-dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/master.swiftdeps"
+  },
+  "/Users/bedobenedek/dev/late/Sources/Late/AppState.swift": {
+    "dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/AppState.d",
+    "object": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/AppState.swift.o",
+    "swiftmodule": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/AppState~partial.swiftmodule",
+    "swift-dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/AppState.swiftdeps",
+    "diagnostics": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/AppState.dia"
+  },
+  "/Users/bedobenedek/dev/late/Sources/Late/ChatStore.swift": {
+    "dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/ChatStore.d",
+    "object": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/ChatStore.swift.o",
+    "swiftmodule": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/ChatStore~partial.swiftmodule",
+    "swift-dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/ChatStore.swiftdeps",
+    "diagnostics": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/ChatStore.dia"
+  },
+  "/Users/bedobenedek/dev/late/Sources/Late/HotKeyManager.swift": {
+    "dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/HotKeyManager.d",
+    "object": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/HotKeyManager.swift.o",
+    "swiftmodule": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/HotKeyManager~partial.swiftmodule",
+    "swift-dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/HotKeyManager.swiftdeps",
+    "diagnostics": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/HotKeyManager.dia"
+  },
+  "/Users/bedobenedek/dev/late/Sources/Late/KeychainStore.swift": {
+    "dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/KeychainStore.d",
+    "object": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/KeychainStore.swift.o",
+    "swiftmodule": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/KeychainStore~partial.swiftmodule",
+    "swift-dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/KeychainStore.swiftdeps",
+    "diagnostics": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/KeychainStore.dia"
+  },
+  "/Users/bedobenedek/dev/late/Sources/Late/LateApp.swift": {
+    "dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/LateApp.d",
+    "object": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/LateApp.swift.o",
+    "swiftmodule": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/LateApp~partial.swiftmodule",
+    "swift-dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/LateApp.swiftdeps",
+    "diagnostics": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/LateApp.dia"
+  },
+  "/Users/bedobenedek/dev/late/Sources/Late/OpenRouterClient.swift": {
+    "dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/OpenRouterClient.d",
+    "object": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/OpenRouterClient.swift.o",
+    "swiftmodule": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/OpenRouterClient~partial.swiftmodule",
+    "swift-dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/OpenRouterClient.swiftdeps",
+    "diagnostics": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/OpenRouterClient.dia"
+  },
+  "/Users/bedobenedek/dev/late/Sources/Late/StatusBarController.swift": {
+    "dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/StatusBarController.d",
+    "object": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/StatusBarController.swift.o",
+    "swiftmodule": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/StatusBarController~partial.swiftmodule",
+    "swift-dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/StatusBarController.swiftdeps",
+    "diagnostics": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/StatusBarController.dia"
+  },
+  "/Users/bedobenedek/dev/late/Sources/Late/WorkspaceView.swift": {
+    "dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/WorkspaceView.d",
+    "object": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/WorkspaceView.swift.o",
+    "swiftmodule": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/WorkspaceView~partial.swiftmodule",
+    "swift-dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/WorkspaceView.swiftdeps",
+    "diagnostics": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/WorkspaceView.dia"
+  }
+}

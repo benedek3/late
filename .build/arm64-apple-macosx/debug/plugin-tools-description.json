@@ -1,0 +1,398 @@
+{
+  "builtTestProducts" : [
+
+  ],
+  "copyCommands" : {
+
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.Late-arm64-apple-macosx26.0-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/sources",
+      "importPath" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/Sources/Late/AppState.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/Sources/Late/ChatStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/Sources/Late/HotKeyManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/Sources/Late/KeychainStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/Sources/Late/LateApp.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/Sources/Late/OpenRouterClient.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/Sources/Late/StatusBarController.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/Sources/Late/WorkspaceView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "Late",
+      "moduleOutputPath" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Modules/Late.swiftmodule",
+      "objects" : [
+        "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/AppState.swift.o",
+        "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/ChatStore.swift.o",
+        "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/HotKeyManager.swift.o",
+        "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/KeychainStore.swift.o",
+        "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/LateApp.swift.o",
+        "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/OpenRouterClient.swift.o",
+        "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/StatusBarController.swift.o",
+        "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/WorkspaceView.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx13.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "Late_main",
+        "-color-diagnostics",
+        "-swift-version",
+        "5",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "late"
+      ],
+      "outputFileMapPath" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/AppState.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/ChatStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/HotKeyManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/KeychainStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/LateApp.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/OpenRouterClient.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/StatusBarController.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/WorkspaceView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Modules/Late.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/bedobenedek/dev/late/Sources/Late/AppState.swift",
+        "/Users/bedobenedek/dev/late/Sources/Late/ChatStore.swift",
+        "/Users/bedobenedek/dev/late/Sources/Late/HotKeyManager.swift",
+        "/Users/bedobenedek/dev/late/Sources/Late/KeychainStore.swift",
+        "/Users/bedobenedek/dev/late/Sources/Late/LateApp.swift",
+        "/Users/bedobenedek/dev/late/Sources/Late/OpenRouterClient.swift",
+        "/Users/bedobenedek/dev/late/Sources/Late/StatusBarController.swift",
+        "/Users/bedobenedek/dev/late/Sources/Late/WorkspaceView.swift"
+      ],
+      "tempsPath" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build",
+      "wholeModuleOptimization" : false
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "Late" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "Late",
+      "-package-name",
+      "late",
+      "-c",
+      "/Users/bedobenedek/dev/late/Sources/Late/AppState.swift",
+      "/Users/bedobenedek/dev/late/Sources/Late/ChatStore.swift",
+      "/Users/bedobenedek/dev/late/Sources/Late/HotKeyManager.swift",
+      "/Users/bedobenedek/dev/late/Sources/Late/KeychainStore.swift",
+      "/Users/bedobenedek/dev/late/Sources/Late/LateApp.swift",
+      "/Users/bedobenedek/dev/late/Sources/Late/OpenRouterClient.swift",
+      "/Users/bedobenedek/dev/late/Sources/Late/StatusBarController.swift",
+      "/Users/bedobenedek/dev/late/Sources/Late/WorkspaceView.swift",
+      "-I",
+      "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx13.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "Late_main",
+      "-color-diagnostics",
+      "-swift-version",
+      "5",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "late",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "Late" : [
+
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+
+  },
+  "traitConfiguration" : {
+    "default" : {
+
+    }
+  },
+  "writeCommands" : {
+    "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late-entitlement.plist" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<entitlement-plist>"
+        },
+        {
+          "kind" : "virtual",
+          "name" : "<com.apple.security.get-task-allow>"
+        }
+      ],
+      "outputFilePath" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late-entitlement.plist"
+    },
+    "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/Sources/Late/AppState.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/Sources/Late/ChatStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/Sources/Late/HotKeyManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/Sources/Late/KeychainStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/Sources/Late/LateApp.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/Sources/Late/OpenRouterClient.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/Sources/Late/StatusBarController.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/Sources/Late/WorkspaceView.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/sources"
+    },
+    "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/AppState.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/ChatStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/HotKeyManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/KeychainStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/LateApp.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/OpenRouterClient.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/StatusBarController.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/WorkspaceView.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.product/Objects.LinkFileList"
+    },
+    "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+        }
+      ],
+      "outputFilePath" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+    }
+  }
+}
