@@ -340,6 +340,86 @@ final class AppState: ObservableObject {
                 saveChats()
             }
         } catch {
+            if error is CancellationError || (error as? URLError)?.code == .cancelled {
+                errorMessage = nil
+                saveChats()
+                isLoading = false
+                return
+            }
+
+            errorMessage = error.localizedDescription
+            if let chatIndex = chats.firstIndex(where: { $0.id == requestChatID }),
+               let messageIndex = chats[chatIndex].messages.firstIndex(where: { $0.id == assistantMessageID }),
+               chats[chatIndex].messages[messageIndex].content.isEmpty {
+                chats[chatIndex].messages.remove(at: messageIndex)
+            }
+            saveChats()
+        }
+
+        isLoading = false
+    }
+
+    func retryResponse(id assistantMessageIDToRetry: UUID) async {
+        guard !isLoading else { return }
+        guard let apiKey = keychain.readAPIKey(), !apiKey.isEmpty else {
+            isConfigured = false
+            return
+        }
+        guard let index = selectedChatIndex,
+              let retryIndex = chats[index].messages.firstIndex(where: { $0.id == assistantMessageIDToRetry && $0.role == .assistant }) else {
+            return
+        }
+
+        let contextEndIndex = retryIndex - 1
+        guard contextEndIndex >= 0,
+              chats[index].messages[contextEndIndex].role == .user else {
+            return
+        }
+
+        errorMessage = nil
+        isLoading = true
+        chats[index].messages.removeSubrange(retryIndex..<chats[index].messages.endIndex)
+        chats[index].updatedAt = Date()
+
+        let assistantMessageID = UUID()
+        chats[index].messages.append(ChatMessage(id: assistantMessageID, role: .assistant, content: ""))
+
+        let requestChatID = chats[index].id
+        let requestMessages = chats[index].messages.filter { $0.id != assistantMessageID }
+        saveChats()
+
+        do {
+            let reply = try await apiClient.streamReply(
+                apiKey: apiKey,
+                model: selectedModel,
+                webSearchEnabled: isWebSearchEnabled,
+                messages: requestMessages,
+                onContentDelta: { [weak self] delta in
+                    guard let self,
+                          let chatIndex = self.chats.firstIndex(where: { $0.id == requestChatID }),
+                          let messageIndex = self.chats[chatIndex].messages.firstIndex(where: { $0.id == assistantMessageID }) else {
+                        return
+                    }
+
+                    self.chats[chatIndex].messages[messageIndex].content += delta
+                    self.chats[chatIndex].updatedAt = Date()
+                }
+            )
+            if let chatIndex = chats.firstIndex(where: { $0.id == requestChatID }),
+               let messageIndex = chats[chatIndex].messages.firstIndex(where: { $0.id == assistantMessageID }) {
+                chats[chatIndex].messages[messageIndex].content = reply.content
+                chats[chatIndex].messages[messageIndex].sources = reply.sources
+                chats[chatIndex].updatedAt = Date()
+                saveChats()
+            }
+        } catch {
+            if error is CancellationError || (error as? URLError)?.code == .cancelled {
+                errorMessage = nil
+                saveChats()
+                isLoading = false
+                return
+            }
+
             errorMessage = error.localizedDescription
             if let chatIndex = chats.firstIndex(where: { $0.id == requestChatID }),
                let messageIndex = chats[chatIndex].messages.firstIndex(where: { $0.id == assistantMessageID }),

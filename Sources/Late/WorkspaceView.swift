@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct WorkspaceView: View {
@@ -88,8 +89,7 @@ private struct ChatView: View {
     @FocusState private var isPromptFocused: Bool
     @State private var isHistoryRevealHovered = false
     @State private var isSettingsPresented = false
-    @State private var transcriptScrollTask: Task<Void, Never>?
-    private let transcriptBottomID = "transcript-bottom"
+    @State private var sendTask: Task<Void, Never>?
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -148,15 +148,6 @@ private struct ChatView: View {
                     }
                 } label: {
                     Image(systemName: "sidebar.left")
-                        .font(.system(size: 13, weight: .semibold))
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    appState.startNewChat()
-                    isPromptFocused = true
-                } label: {
-                    Image(systemName: "plus")
                         .font(.system(size: 13, weight: .semibold))
                 }
                 .buttonStyle(.plain)
@@ -260,34 +251,6 @@ private struct ChatView: View {
 
             Spacer()
 
-            HStack(spacing: 7) {
-                Text("Model")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-
-                Picker("Model", selection: $appState.selectedModel) {
-                    ForEach(AppState.availableModels) { model in
-                        Text(model.name).tag(model.id)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .frame(width: 176)
-            }
-            .padding(.leading, 2)
-
-            Button {
-                appState.startNewChat()
-                isPromptFocused = true
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 15, weight: .bold))
-                    .frame(width: 30, height: 30)
-                    .background(Color.white.opacity(0.12), in: Circle())
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-
             Button {
                 isSettingsPresented = true
             } label: {
@@ -320,60 +283,42 @@ private struct ChatView: View {
     }
 
     private var transcript: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.vertical, showsIndicators: false) {
-                LazyVStack(alignment: .leading, spacing: 26) {
-                    if appState.currentMessages.isEmpty {
-                        EmptyTranscriptView()
-                            .frame(maxWidth: .infinity, minHeight: 330)
-                    } else {
-                        ForEach(appState.currentMessages) { message in
-                            MessageRow(message: message)
-                                .id(message.id)
-                        }
+        ScrollView(.vertical, showsIndicators: false) {
+            LazyVStack(alignment: .leading, spacing: 26) {
+                if appState.currentMessages.isEmpty {
+                    EmptyTranscriptView()
+                        .frame(maxWidth: .infinity, minHeight: 330)
+                } else {
+                    ForEach(appState.currentMessages) { message in
+                        MessageRow(
+                            message: message,
+                            showsActions: message.role == .assistant && !appState.isLoading && !message.content.isEmpty,
+                            onRetry: {
+                                startStreaming {
+                                    await appState.retryResponse(id: message.id)
+                                }
+                            }
+                        )
+                            .id(message.id)
                     }
+                }
 
-                    if appState.isLoading {
-                        HStack(spacing: 8) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text("Thinking...")
-                                .foregroundStyle(.secondary)
-                        }
-                        .font(.caption)
-                        .padding(.vertical, 8)
+                if appState.isLoading {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Thinking...")
+                            .foregroundStyle(.secondary)
                     }
-
-                    Color.clear
-                        .frame(height: 96)
-                        .id(transcriptBottomID)
+                    .font(.caption)
+                    .padding(.vertical, 8)
                 }
-                .padding(.horizontal, 28)
-                .padding(.top, 24)
-            }
-            .onChange(of: appState.currentMessages) { messages in
-                guard let last = messages.last else { return }
-                scheduleTranscriptScroll(with: proxy, animated: !last.content.isEmpty)
-            }
-            .onChange(of: appState.isLoading) { _ in
-                scheduleTranscriptScroll(with: proxy, animated: true)
-            }
-        }
-    }
 
-    private func scheduleTranscriptScroll(with proxy: ScrollViewProxy, animated: Bool) {
-        transcriptScrollTask?.cancel()
-        transcriptScrollTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 35_000_000)
-            guard !Task.isCancelled else { return }
-
-            if animated {
-                withAnimation(.easeOut(duration: 0.16)) {
-                    proxy.scrollTo(transcriptBottomID, anchor: .bottom)
-                }
-            } else {
-                proxy.scrollTo(transcriptBottomID, anchor: .bottom)
+                Color.clear
+                    .frame(height: 96)
             }
+            .padding(.horizontal, 28)
+            .padding(.top, 24)
         }
     }
 
@@ -387,60 +332,107 @@ private struct ChatView: View {
                     .padding(.horizontal, 4)
             }
 
-            HStack(alignment: .center, spacing: 12) {
-                Button {
-                    appState.isWebSearchEnabled.toggle()
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "globe")
-                            .font(.system(size: 13, weight: .semibold))
-                        Text("Web")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    }
-                    .foregroundStyle(appState.isWebSearchEnabled ? .black : .secondary)
-                    .padding(.horizontal, 9)
-                    .frame(height: 30)
-                    .background(appState.isWebSearchEnabled ? Color.white : Color.white.opacity(0.08), in: Capsule())
-                    .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-
+            VStack(alignment: .leading, spacing: 8) {
                 TextField("Ask anything...", text: $appState.prompt, axis: .vertical)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 16, weight: .regular, design: .rounded))
+                    .font(.system(size: 15, weight: .regular, design: .rounded))
                     .lineLimit(1...4)
                     .focused($isPromptFocused)
-                    .padding(.vertical, 10)
-                    .padding(.leading, 2)
-                    .padding(.trailing, 4)
+                    .padding(.horizontal, 2)
+                    .padding(.top, 6)
 
-                Button {
-                    Task { await appState.sendPrompt() }
-                } label: {
-                    Image(systemName: "arrow.up")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.black)
-                        .frame(width: 32, height: 32)
-                        .background(Color.white, in: Circle())
-                        .contentShape(Circle())
+                HStack(alignment: .center, spacing: 12) {
+                    Button {
+                        appState.isWebSearchEnabled.toggle()
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "globe")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text("Web")
+                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        }
+                        .foregroundStyle(appState.isWebSearchEnabled ? .black : .secondary)
+                        .padding(.horizontal, 8)
+                        .frame(height: 28)
+                        .background(appState.isWebSearchEnabled ? Color.white : Color.white.opacity(0.08), in: Capsule())
+                        .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer(minLength: 12)
+
+                    Menu {
+                        ForEach(AppState.availableModels) { model in
+                            Button {
+                                appState.selectedModel = model.id
+                            } label: {
+                                if appState.selectedModel == model.id {
+                                    Label(model.name, systemImage: "checkmark")
+                                } else {
+                                    Text(model.name)
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(compactModelName(appState.selectedModelName))
+                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                                .lineLimit(1)
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 10, weight: .semibold))
+                        }
+                        .foregroundStyle(.secondary)
+                        .frame(height: 28)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        if appState.isLoading {
+                            sendTask?.cancel()
+                        } else {
+                            startStreaming {
+                                await appState.sendPrompt()
+                            }
+                        }
+                    } label: {
+                        Image(systemName: appState.isLoading ? "stop.fill" : "arrow.up")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(.black)
+                            .frame(width: 30, height: 30)
+                            .background(Color.white, in: Circle())
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .disabled(!appState.isLoading && appState.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .opacity(!appState.isLoading && appState.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.35 : 1)
                 }
-                .buttonStyle(.plain)
-                .keyboardShortcut(.return, modifiers: .command)
-                .disabled(appState.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || appState.isLoading)
-                .opacity(appState.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || appState.isLoading ? 0.35 : 1)
             }
             .padding(.leading, 14)
             .padding(.trailing, 9)
-            .padding(.vertical, 7)
+            .padding(.vertical, 8)
             .background(Color.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-
-            Text("Command+Return to send")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 4)
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 18)
+    }
+
+    private func compactModelName(_ name: String) -> String {
+        name
+            .replacingOccurrences(of: "GPT-", with: "")
+            .replacingOccurrences(of: "Claude ", with: "")
+            .replacingOccurrences(of: "OpenRouter Auto", with: "Auto")
+    }
+
+    private func startStreaming(_ operation: @escaping @MainActor () async -> Void) {
+        sendTask?.cancel()
+        sendTask = Task {
+            await operation()
+            await MainActor.run {
+                sendTask = nil
+            }
+        }
     }
 }
 
@@ -532,6 +524,8 @@ private struct EmptyTranscriptView: View {
 
 private struct MessageRow: View {
     let message: ChatMessage
+    let showsActions: Bool
+    let onRetry: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -546,8 +540,39 @@ private struct MessageRow: View {
             if !message.sources.isEmpty {
                 SourceList(sources: message.sources)
             }
+
+            if showsActions {
+                HStack(spacing: 6) {
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(message.content, forType: .string)
+                    } label: {
+                        Label("Copy", systemImage: "doc.on.doc")
+                    }
+                    .buttonStyle(MessageActionButtonStyle())
+
+                    Button(action: onRetry) {
+                        Label("Try again", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(MessageActionButtonStyle())
+                }
+                .padding(.top, 2)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct MessageActionButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .labelStyle(.titleAndIcon)
+            .padding(.horizontal, 9)
+            .frame(height: 28)
+            .background(Color.white.opacity(configuration.isPressed ? 0.16 : 0.08), in: Capsule())
+            .contentShape(Capsule())
     }
 }
 

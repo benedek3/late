@@ -20,6 +20,7 @@ After setup:
 - Press `Option+Tab` to toggle it globally.
 - Press `Escape` to hide the workspace.
 - Press `Command+B` to show or hide history.
+- Press `Command+T` to start a new chat.
 - Use `Settings` to update the OpenRouter key or change the appearance shortcut.
 - Toggle `Web` in the prompt bar to enable OpenRouter web search for the next request. Web answers are instructed to include sources, and returned source annotations are shown as clickable links under the response.
 - Start a new chat without deleting the current one.

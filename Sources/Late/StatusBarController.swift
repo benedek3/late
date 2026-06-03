@@ -103,6 +103,14 @@ final class StatusBarController: NSObject {
                 return nil
             }
 
+            if event.keyCode == UInt16(kVK_ANSI_T), modifiers.contains(.command) {
+                Task { @MainActor [appState] in
+                    appState.startNewChat()
+                    appState.focusPrompt()
+                }
+                return nil
+            }
+
             return event
         }
     }
