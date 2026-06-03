@@ -88,6 +88,8 @@ private struct ChatView: View {
     @FocusState private var isPromptFocused: Bool
     @State private var isHistoryRevealHovered = false
     @State private var isSettingsPresented = false
+    @State private var transcriptScrollTask: Task<Void, Never>?
+    private let transcriptBottomID = "transcript-bottom"
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -341,15 +343,36 @@ private struct ChatView: View {
                         .font(.caption)
                         .padding(.vertical, 8)
                     }
+
+                    Color.clear
+                        .frame(height: 96)
+                        .id(transcriptBottomID)
                 }
                 .padding(.horizontal, 28)
-                .padding(.vertical, 24)
+                .padding(.top, 24)
             }
             .onChange(of: appState.currentMessages) { messages in
                 guard let last = messages.last else { return }
-                withAnimation(.easeOut(duration: 0.2)) {
-                    proxy.scrollTo(last.id, anchor: .bottom)
+                scheduleTranscriptScroll(with: proxy, animated: !last.content.isEmpty)
+            }
+            .onChange(of: appState.isLoading) { _ in
+                scheduleTranscriptScroll(with: proxy, animated: true)
+            }
+        }
+    }
+
+    private func scheduleTranscriptScroll(with proxy: ScrollViewProxy, animated: Bool) {
+        transcriptScrollTask?.cancel()
+        transcriptScrollTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 35_000_000)
+            guard !Task.isCancelled else { return }
+
+            if animated {
+                withAnimation(.easeOut(duration: 0.16)) {
+                    proxy.scrollTo(transcriptBottomID, anchor: .bottom)
                 }
+            } else {
+                proxy.scrollTo(transcriptBottomID, anchor: .bottom)
             }
         }
     }

@@ -59,9 +59,9 @@ struct ChatSource: Identifiable, Codable, Equatable {
 struct ChatMessage: Identifiable, Codable, Equatable {
     let id: UUID
     let role: Role
-    let content: String
+    var content: String
     let createdAt: Date
-    let sources: [ChatSource]
+    var sources: [ChatSource]
 
     init(id: UUID = UUID(), role: Role, content: String, createdAt: Date = Date(), sources: [ChatSource] = []) {
         self.id = id
@@ -308,24 +308,44 @@ final class AppState: ObservableObject {
             chats[index].title = Self.title(from: userPrompt)
         }
 
+        let assistantMessageID = UUID()
+        chats[index].messages.append(ChatMessage(id: assistantMessageID, role: .assistant, content: ""))
+
         let requestChatID = chats[index].id
         let requestMessages = chats[index].messages
         saveChats()
 
         do {
-            let reply = try await apiClient.fetchReply(
+            let reply = try await apiClient.streamReply(
                 apiKey: apiKey,
                 model: selectedModel,
                 webSearchEnabled: isWebSearchEnabled,
-                messages: requestMessages
+                messages: requestMessages.filter { $0.id != assistantMessageID },
+                onContentDelta: { [weak self] delta in
+                    guard let self,
+                          let chatIndex = self.chats.firstIndex(where: { $0.id == requestChatID }),
+                          let messageIndex = self.chats[chatIndex].messages.firstIndex(where: { $0.id == assistantMessageID }) else {
+                        return
+                    }
+
+                    self.chats[chatIndex].messages[messageIndex].content += delta
+                    self.chats[chatIndex].updatedAt = Date()
+                }
             )
-            if let index = chats.firstIndex(where: { $0.id == requestChatID }) {
-                chats[index].messages.append(ChatMessage(role: .assistant, content: reply.content, sources: reply.sources))
-                chats[index].updatedAt = Date()
+            if let chatIndex = chats.firstIndex(where: { $0.id == requestChatID }),
+               let messageIndex = chats[chatIndex].messages.firstIndex(where: { $0.id == assistantMessageID }) {
+                chats[chatIndex].messages[messageIndex].content = reply.content
+                chats[chatIndex].messages[messageIndex].sources = reply.sources
+                chats[chatIndex].updatedAt = Date()
                 saveChats()
             }
         } catch {
             errorMessage = error.localizedDescription
+            if let chatIndex = chats.firstIndex(where: { $0.id == requestChatID }),
+               let messageIndex = chats[chatIndex].messages.firstIndex(where: { $0.id == assistantMessageID }),
+               chats[chatIndex].messages[messageIndex].content.isEmpty {
+                chats[chatIndex].messages.remove(at: messageIndex)
+            }
             saveChats()
         }
 

@@ -3,7 +3,7 @@ import Foundation
 struct OpenRouterClient {
     private let endpoint = URL(string: "https://openrouter.ai/api/v1/chat/completions")!
 
-    func fetchReply(apiKey: String, model: String, webSearchEnabled: Bool, messages: [ChatMessage]) async throws -> AssistantReply {
+    func streamReply(apiKey: String, model: String, webSearchEnabled: Bool, messages: [ChatMessage], onContentDelta: @escaping @MainActor (String) -> Void) async throws -> AssistantReply {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
@@ -23,16 +23,22 @@ struct OpenRouterClient {
             ChatCompletionRequest(
                 model: model,
                 messages: formattedMessages,
+                stream: true,
                 plugins: webSearchEnabled ? [RequestPlugin(id: "web")] : nil
             )
         )
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (bytes, response) = try await URLSession.shared.bytes(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw OpenRouterClientError.invalidResponse
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
+            var data = Data()
+            for try await byte in bytes {
+                data.append(byte)
+            }
+
             if let apiError = try? JSONDecoder().decode(APIErrorEnvelope.self, from: data),
                let message = apiError.error?.message {
                 throw OpenRouterClientError.api(message)
@@ -41,12 +47,50 @@ struct OpenRouterClient {
             throw OpenRouterClientError.api("OpenRouter returned HTTP \(httpResponse.statusCode).")
         }
 
-        let decoded = try JSONDecoder().decode(ChatCompletionEnvelope.self, from: data)
-        if let reply = decoded.reply, !reply.content.isEmpty {
-            return reply
+        var content = ""
+        var sources: [ChatSource] = []
+
+        for try await line in bytes.lines {
+            let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmedLine.hasPrefix("data:") else { continue }
+
+            let payload = trimmedLine.dropFirst("data:".count).trimmingCharacters(in: .whitespacesAndNewlines)
+            if payload == "[DONE]" {
+                break
+            }
+
+            guard let data = payload.data(using: .utf8) else { continue }
+            let chunk = try JSONDecoder().decode(StreamingChatCompletionEnvelope.self, from: data)
+
+            if let message = chunk.error?.message {
+                throw OpenRouterClientError.api(message)
+            }
+
+            let delta = chunk.contentDelta
+            if !delta.isEmpty {
+                content += delta
+                await onContentDelta(delta)
+            }
+
+            sources.append(contentsOf: chunk.sources)
+            sources = Self.uniqueSources(sources)
+        }
+
+        let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedContent.isEmpty {
+            return AssistantReply(content: trimmedContent, sources: sources)
         }
 
         throw OpenRouterClientError.emptyResponse
+    }
+
+    fileprivate static func uniqueSources(_ sources: [ChatSource]) -> [ChatSource] {
+        var seen = Set<String>()
+        return sources.filter { source in
+            guard !seen.contains(source.url) else { return false }
+            seen.insert(source.url)
+            return true
+        }
     }
 }
 
@@ -58,6 +102,7 @@ struct AssistantReply {
 private struct ChatCompletionRequest: Encodable {
     let model: String
     let messages: [RequestMessage]
+    let stream: Bool
     let plugins: [RequestPlugin]?
 }
 
@@ -70,37 +115,29 @@ private struct RequestPlugin: Encodable {
     let id: String
 }
 
-private struct ChatCompletionEnvelope: Decodable {
-    let choices: [Choice]
+private struct StreamingChatCompletionEnvelope: Decodable {
+    let choices: [StreamingChoice]?
     let citations: [FlexibleCitation]?
+    let error: APIError?
 
-    var reply: AssistantReply? {
-        guard let message = choices.first?.message else { return nil }
-        let text = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return nil }
+    var contentDelta: String {
+        choices?.compactMap(\.delta?.content).joined() ?? ""
+    }
 
-        return AssistantReply(
-            content: text,
-            sources: Self.uniqueSources(message.sources + (citations?.map(\.source) ?? []))
+    var sources: [ChatSource] {
+        OpenRouterClient.uniqueSources(
+            (choices?.flatMap { $0.delta?.sources ?? [] } ?? []) +
+            (citations?.map(\.source) ?? [])
         )
     }
-
-    private static func uniqueSources(_ sources: [ChatSource]) -> [ChatSource] {
-        var seen = Set<String>()
-        return sources.filter { source in
-            guard !seen.contains(source.url) else { return false }
-            seen.insert(source.url)
-            return true
-        }
-    }
 }
 
-private struct Choice: Decodable {
-    let message: ResponseMessage
+private struct StreamingChoice: Decodable {
+    let delta: StreamingDelta?
 }
 
-private struct ResponseMessage: Decodable {
-    let content: String
+private struct StreamingDelta: Decodable {
+    let content: String?
     let annotations: [ResponseAnnotation]?
     let citations: [FlexibleCitation]?
 
