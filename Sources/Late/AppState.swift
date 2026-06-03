@@ -31,22 +31,66 @@ extension Notification.Name {
     static let appearanceShortcutDidChange = Notification.Name("appearanceShortcutDidChange")
 }
 
+struct ChatSource: Identifiable, Codable, Equatable {
+    let id: UUID
+    let title: String?
+    let url: String
+
+    init(id: UUID = UUID(), title: String?, url: String) {
+        self.id = id
+        self.title = title
+        self.url = url
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case url
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        self.title = try container.decodeIfPresent(String.self, forKey: .title)
+        self.url = try container.decode(String.self, forKey: .url)
+    }
+}
+
 struct ChatMessage: Identifiable, Codable, Equatable {
     let id: UUID
     let role: Role
     let content: String
     let createdAt: Date
+    let sources: [ChatSource]
 
-    init(id: UUID = UUID(), role: Role, content: String, createdAt: Date = Date()) {
+    init(id: UUID = UUID(), role: Role, content: String, createdAt: Date = Date(), sources: [ChatSource] = []) {
         self.id = id
         self.role = role
         self.content = content
         self.createdAt = createdAt
+        self.sources = sources
     }
 
     enum Role: String, Codable {
         case user
         case assistant
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case role
+        case content
+        case createdAt
+        case sources
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        self.role = try container.decode(Role.self, forKey: .role)
+        self.content = try container.decode(String.self, forKey: .content)
+        self.createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        self.sources = try container.decodeIfPresent([ChatSource].self, forKey: .sources) ?? []
     }
 }
 
@@ -276,7 +320,7 @@ final class AppState: ObservableObject {
                 messages: requestMessages
             )
             if let index = chats.firstIndex(where: { $0.id == requestChatID }) {
-                chats[index].messages.append(ChatMessage(role: .assistant, content: reply))
+                chats[index].messages.append(ChatMessage(role: .assistant, content: reply.content, sources: reply.sources))
                 chats[index].updatedAt = Date()
                 saveChats()
             }

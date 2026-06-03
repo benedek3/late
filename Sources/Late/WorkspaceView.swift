@@ -519,8 +519,45 @@ private struct MessageRow: View {
             FormattedMessageText(message.content)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
+
+            if !message.sources.isEmpty {
+                SourceList(sources: message.sources)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct SourceList: View {
+    let sources: [ChatSource]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("Sources")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            ForEach(sources) { source in
+                if let url = URL(string: source.url) {
+                    Link(destination: url) {
+                        HStack(spacing: 7) {
+                            Image(systemName: "link")
+                                .font(.system(size: 11, weight: .semibold))
+                            Text(source.title?.isEmpty == false ? source.title! : source.url)
+                                .lineLimit(1)
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                } else {
+                    Text(source.title?.isEmpty == false ? source.title! : source.url)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+        }
+        .padding(.top, 4)
     }
 }
 
