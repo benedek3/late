@@ -47,14 +47,7 @@ private struct SetupView: View {
                 Text("OpenRouter API Key")
                     .font(.headline)
                 SecureField("sk-or-...", text: $appState.setupAPIKey)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 16, weight: .medium, design: .monospaced))
-                    .padding(14)
-                    .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
-                    )
+                    .secureInputStyle(design: .monospaced)
                     .onSubmit(appState.saveAPIKey)
                 Text("Your key is stored locally in macOS Keychain and is only used to call OpenRouter from this app.")
                     .font(.caption)
@@ -108,30 +101,14 @@ private struct HistoryAccessView: View {
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                Text("History Password")
-                    .font(.headline)
                 SecureField("Password", text: $password)
                     .focused($isPasswordFocused)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 16, weight: .medium, design: .rounded))
-                    .padding(14)
-                    .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
-                    )
+                    .secureInputStyle()
                     .onSubmit(submit)
 
                 if isSetup {
                     SecureField("Confirm password", text: $confirmation)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 16, weight: .medium, design: .rounded))
-                        .padding(14)
-                        .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
-                        )
+                        .secureInputStyle()
                         .onSubmit(submit)
                 }
 
@@ -875,14 +852,7 @@ private struct SettingsPanel: View {
                 Text("OpenRouter API Key")
                     .font(.headline)
                 SecureField("Paste a new key to replace the current one", text: $appState.settingsAPIKey)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 14, weight: .medium, design: .monospaced))
-                    .padding(12)
-                    .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
-                    )
+                    .secureInputStyle(size: 14, padding: 12, backgroundOpacity: 0.08, cornerRadius: 12, design: .monospaced)
 
                 HStack {
                     Text("Leave blank to keep the saved key.")
@@ -1382,5 +1352,20 @@ private struct VisualEffectBackground: NSViewRepresentable {
     func updateNSView(_ view: NSVisualEffectView, context: Context) {
         view.material = material
         view.blendingMode = blendingMode
+    }
+}
+
+private extension View {
+    func secureInputStyle(
+        size: CGFloat = 16,
+        padding: CGFloat = 14,
+        backgroundOpacity: Double = 0.10,
+        cornerRadius: CGFloat = 14,
+        design: Font.Design = .rounded
+    ) -> some View {
+        textFieldStyle(.plain)
+            .font(.system(size: size, weight: .medium, design: design))
+            .padding(padding)
+            .background(Color.white.opacity(backgroundOpacity), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 }

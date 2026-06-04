@@ -3,29 +3,113 @@ import Foundation
 import Security
 
 struct ChatStore {
-    private let fileName = "chats.json"
-    private let encryptedFileName = "chats.enc.json"
+    private let plaintextFileName = "chats.json"
+    private let legacyEncryptedFileName = "chats.enc.json"
+    private let indexFileName = "chats.index.enc.json"
+    private let threadsDirectoryName = "chats"
     private let encryptionVersion = 1
     private let keyByteCount = 32
     private let defaultIterations = 120_000
 
     var hasEncryptedStore: Bool {
-        FileManager.default.fileExists(atPath: encryptedFileURL.path)
+        FileManager.default.fileExists(atPath: indexFileURL.path) ||
+            FileManager.default.fileExists(atPath: legacyEncryptedFileURL.path)
     }
 
     var hasPlaintextStore: Bool {
-        FileManager.default.fileExists(atPath: fileURL.path)
+        FileManager.default.fileExists(atPath: plaintextFileURL.path)
     }
 
     func loadPlaintext() -> [ChatThread] {
-        guard let data = try? Data(contentsOf: fileURL) else { return [] }
+        guard let data = try? Data(contentsOf: plaintextFileURL) else { return [] }
 
-        return decodeChats(from: data) ?? []
+        return decode([ChatThread].self, from: data) ?? []
     }
 
     func unlock(password: String) throws -> (chats: [ChatThread], key: SymmetricKey) {
-        let archive = try readArchive()
+        if FileManager.default.fileExists(atPath: indexFileURL.path) {
+            let indexArchive = try readArchive(from: indexFileURL)
+            let key = deriveKey(password: password, salt: indexArchive.saltData, iterations: indexArchive.iterations)
+            let index = try decrypt(ChatIndex.self, from: indexArchive, using: key)
+            return (metadataThreads(from: index.entries), key)
+        }
+
+        return try unlockLegacyStore(password: password)
+    }
+
+    @discardableResult
+    func createEncryptedStore(chats: [ChatThread], password: String) throws -> SymmetricKey {
+        let salt = randomData(byteCount: 16)
+        let key = deriveKey(password: password, salt: salt, iterations: defaultIterations)
+        try writePerThreadStore(chats: chats, key: key, salt: salt, iterations: defaultIterations)
+        _ = try unlock(password: password)
+        return key
+    }
+
+    func loadThread(id: UUID, key: SymmetricKey) throws -> ChatThread {
+        let archive = try readArchive(from: threadFileURL(for: id))
+        return try decrypt(ChatThread.self, from: archive, using: key)
+    }
+
+    func saveIndex(_ chats: [ChatThread], key: SymmetricKey) throws {
+        let archive = try readIndexArchive()
+        try writeIndex(chats: chats, key: key, salt: archive.saltData, iterations: archive.iterations)
+    }
+
+    func saveThread(_ chat: ChatThread, key: SymmetricKey) throws {
+        let archive = try readIndexArchive()
+        try writeEncryptedPayload(chat, to: threadFileURL(for: chat.id), key: key, salt: archive.saltData, iterations: archive.iterations)
+    }
+
+    func deleteThread(id: UUID) {
+        try? FileManager.default.removeItem(at: threadFileURL(for: id))
+    }
+
+    func deletePlaintextStore() {
+        try? FileManager.default.removeItem(at: plaintextFileURL)
+    }
+
+    private func unlockLegacyStore(password: String) throws -> (chats: [ChatThread], key: SymmetricKey) {
+        let archive = try readArchive(from: legacyEncryptedFileURL)
         let key = deriveKey(password: password, salt: archive.saltData, iterations: archive.iterations)
+        let chats = try decrypt([ChatThread].self, from: archive, using: key)
+
+        try writePerThreadStore(chats: chats, key: key, salt: archive.saltData, iterations: archive.iterations)
+        let migratedIndex = try readArchive(from: indexFileURL)
+        _ = try decrypt(ChatIndex.self, from: migratedIndex, using: key)
+        try? FileManager.default.removeItem(at: legacyEncryptedFileURL)
+
+        return (metadataThreads(from: chats.map(ChatIndexEntry.init(chat:))), key)
+    }
+
+    private func writePerThreadStore(chats: [ChatThread], key: SymmetricKey, salt: Data, iterations: Int) throws {
+        try FileManager.default.createDirectory(at: threadsDirectoryURL, withIntermediateDirectories: true)
+
+        for chat in chats {
+            try writeEncryptedPayload(chat, to: threadFileURL(for: chat.id), key: key, salt: salt, iterations: iterations)
+        }
+
+        try writeIndex(chats: chats, key: key, salt: salt, iterations: iterations)
+    }
+
+    private func writeIndex(chats: [ChatThread], key: SymmetricKey, salt: Data, iterations: Int) throws {
+        let entries = chats.map(ChatIndexEntry.init(chat:)).sorted { $0.updatedAt > $1.updatedAt }
+        try writeEncryptedPayload(ChatIndex(entries: entries), to: indexFileURL, key: key, salt: salt, iterations: iterations)
+    }
+
+    private func metadataThreads(from entries: [ChatIndexEntry]) -> [ChatThread] {
+        entries.map { entry in
+            ChatThread(
+                id: entry.id,
+                title: entry.title,
+                messages: [],
+                createdAt: entry.createdAt,
+                updatedAt: entry.updatedAt
+            )
+        }
+    }
+
+    private func decrypt<T: Decodable>(_ type: T.Type, from archive: EncryptedArchive, using key: SymmetricKey) throws -> T {
         let sealedBox = try AES.GCM.SealedBox(
             nonce: AES.GCM.Nonce(data: archive.nonceData),
             ciphertext: archive.ciphertextData,
@@ -33,81 +117,74 @@ struct ChatStore {
         )
         let data = try AES.GCM.open(sealedBox, using: key)
 
-        guard let chats = decodeChats(from: data) else {
+        guard let value = decode(T.self, from: data) else {
             throw StoreError.invalidPayload
         }
 
-        return (chats, key)
+        return value
     }
 
-    @discardableResult
-    func createEncryptedStore(chats: [ChatThread], password: String) throws -> SymmetricKey {
-        let salt = randomData(byteCount: 16)
-        let key = deriveKey(password: password, salt: salt, iterations: defaultIterations)
-        try writeEncrypted(chats: chats, key: key, salt: salt, iterations: defaultIterations)
-        _ = try unlock(password: password)
-        return key
+    private func writeEncryptedPayload<T: Encodable>(_ payload: T, to url: URL, key: SymmetricKey, salt: Data, iterations: Int) throws {
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: threadsDirectoryURL, withIntermediateDirectories: true)
+
+        let sealedBox = try AES.GCM.seal(encoded(payload), using: key)
+        let archive = EncryptedArchive(
+            version: encryptionVersion,
+            kdf: "PBKDF2-HMAC-SHA256",
+            iterations: iterations,
+            salt: salt.base64EncodedString(),
+            cipher: "AES-256-GCM",
+            nonce: Data(sealedBox.nonce).base64EncodedString(),
+            ciphertext: sealedBox.ciphertext.base64EncodedString(),
+            tag: sealedBox.tag.base64EncodedString()
+        )
+
+        let data = try encoded(archive)
+        try data.write(to: url, options: Data.WritingOptions.atomic)
     }
 
-    func saveEncrypted(_ chats: [ChatThread], key: SymmetricKey) throws {
-        let archive = try readArchive()
-        try writeEncrypted(chats: chats, key: key, salt: archive.saltData, iterations: archive.iterations)
+    private func readArchive(from url: URL) throws -> EncryptedArchive {
+        let data = try Data(contentsOf: url)
+        guard let archive = decode(EncryptedArchive.self, from: data) else {
+            throw StoreError.invalidArchive
+        }
+
+        return archive
     }
 
-    func deletePlaintextStore() {
-        try? FileManager.default.removeItem(at: fileURL)
+    private func readIndexArchive() throws -> EncryptedArchive {
+        if FileManager.default.fileExists(atPath: indexFileURL.path) {
+            return try readArchive(from: indexFileURL)
+        }
+
+        return EncryptedArchive(
+            version: encryptionVersion,
+            kdf: "PBKDF2-HMAC-SHA256",
+            iterations: defaultIterations,
+            salt: randomData(byteCount: 16).base64EncodedString(),
+            cipher: "AES-256-GCM",
+            nonce: "",
+            ciphertext: "",
+            tag: ""
+        )
     }
 
-    private func decodeChats(from data: Data) -> [ChatThread]? {
+    private func decode<T: Decodable>(_ type: T.Type, from data: Data) -> T? {
         do {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
-            return try decoder.decode([ChatThread].self, from: data)
+            return try decoder.decode(T.self, from: data)
         } catch {
             return nil
         }
     }
 
-    private func encodedChats(_ chats: [ChatThread]) throws -> Data {
+    private func encoded<T: Encodable>(_ payload: T) throws -> Data {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return try encoder.encode(chats)
-    }
-
-    private func readArchive() throws -> EncryptedChatArchive {
-        let data = try Data(contentsOf: encryptedFileURL)
-        do {
-            let decoder = JSONDecoder()
-            return try decoder.decode(EncryptedChatArchive.self, from: data)
-        } catch {
-            throw StoreError.invalidArchive
-        }
-    }
-
-    private func writeEncrypted(chats: [ChatThread], key: SymmetricKey, salt: Data, iterations: Int) throws {
-        do {
-            try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
-            let sealedBox = try AES.GCM.seal(encodedChats(chats), using: key)
-            let sealedNonce = Data(sealedBox.nonce)
-
-            let archive = EncryptedChatArchive(
-                version: encryptionVersion,
-                kdf: "PBKDF2-HMAC-SHA256",
-                iterations: iterations,
-                salt: salt.base64EncodedString(),
-                cipher: "AES-256-GCM",
-                nonce: sealedNonce.base64EncodedString(),
-                ciphertext: sealedBox.ciphertext.base64EncodedString(),
-                tag: sealedBox.tag.base64EncodedString()
-            )
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let data = try encoder.encode(archive)
-            try data.write(to: encryptedFileURL, options: Data.WritingOptions.atomic)
-        } catch {
-            throw error
-        }
+        return try encoder.encode(payload)
     }
 
     private func deriveKey(password: String, salt: Data, iterations: Int) -> SymmetricKey {
@@ -156,16 +233,46 @@ struct ChatStore {
         return baseURL.appendingPathComponent("Late", isDirectory: true)
     }
 
-    private var fileURL: URL {
-        directoryURL.appendingPathComponent(fileName)
+    private var plaintextFileURL: URL {
+        directoryURL.appendingPathComponent(plaintextFileName)
     }
 
-    private var encryptedFileURL: URL {
-        directoryURL.appendingPathComponent(encryptedFileName)
+    private var legacyEncryptedFileURL: URL {
+        directoryURL.appendingPathComponent(legacyEncryptedFileName)
+    }
+
+    private var indexFileURL: URL {
+        directoryURL.appendingPathComponent(indexFileName)
+    }
+
+    private var threadsDirectoryURL: URL {
+        directoryURL.appendingPathComponent(threadsDirectoryName, isDirectory: true)
+    }
+
+    private func threadFileURL(for id: UUID) -> URL {
+        threadsDirectoryURL.appendingPathComponent("\(id.uuidString).enc.json")
     }
 }
 
-private struct EncryptedChatArchive: Codable {
+private struct ChatIndex: Codable {
+    let entries: [ChatIndexEntry]
+}
+
+private struct ChatIndexEntry: Codable {
+    let id: UUID
+    let title: String
+    let createdAt: Date
+    let updatedAt: Date
+
+    init(chat: ChatThread) {
+        self.id = chat.id
+        self.title = chat.title
+        self.createdAt = chat.createdAt
+        self.updatedAt = chat.updatedAt
+    }
+}
+
+private struct EncryptedArchive: Codable {
     let version: Int
     let kdf: String
     let iterations: Int

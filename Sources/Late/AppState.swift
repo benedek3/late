@@ -202,6 +202,7 @@ final class AppState: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var isTranslationMode = false
+    @Published var isCursorAgentVisible = true
     @Published var translationInput = ""
     @Published var translationOutput = ""
     @Published var translationTargetLanguage = "English"
@@ -210,6 +211,7 @@ final class AppState: ObservableObject {
     private let apiClient = OpenRouterClient()
     private let chatStore = ChatStore()
     private var historyEncryptionKey: SymmetricKey?
+    private var loadedChatID: UUID?
     private let selectedModelKey = "selected-model"
     private let selectedChatIDKey = "selected-chat-id"
     private let selectedShortcutKey = "selected-shortcut"
@@ -287,6 +289,12 @@ final class AppState: ObservableObject {
             chats = result.chats.isEmpty ? [ChatThread()] : result.chats
             selectInitialChat()
             historyAccessState = .unlocked
+            if result.chats.isEmpty {
+                loadedChatID = selectedChatID
+                saveChats()
+            } else {
+                try loadSelectedChat()
+            }
             errorMessage = nil
             focusPrompt()
         } catch {
@@ -311,9 +319,10 @@ final class AppState: ObservableObject {
             let key = try chatStore.createEncryptedStore(chats: initialChats, password: password)
             chatStore.deletePlaintextStore()
             historyEncryptionKey = key
-            chats = initialChats
+            chats = initialChats.map(Self.metadataThread)
             selectInitialChat()
             historyAccessState = .unlocked
+            try loadSelectedChat()
             errorMessage = nil
             focusPrompt()
         } catch {
@@ -322,18 +331,33 @@ final class AppState: ObservableObject {
     }
 
     func startNewChat() {
+        saveChats()
+        unloadChats(except: nil)
         let chat = ChatThread()
         chats.append(chat)
         selectedChatID = chat.id
+        loadedChatID = chat.id
         prompt = ""
         errorMessage = nil
         saveChats()
     }
 
     func selectChat(_ chat: ChatThread) {
+        guard selectedChatID != chat.id else {
+            focusPrompt()
+            return
+        }
+
+        saveChats()
         selectedChatID = chat.id
         prompt = ""
         errorMessage = nil
+        do {
+            try loadSelectedChat()
+        } catch {
+            errorMessage = "Could not load selected chat."
+        }
+        focusPrompt()
     }
 
     func focusPrompt() {
@@ -367,16 +391,23 @@ final class AppState: ObservableObject {
         guard let index = chats.firstIndex(where: { $0.id == chat.id }) else { return }
         let wasSelected = selectedChatID == chat.id
         chats.remove(at: index)
+        chatStore.deleteThread(id: chat.id)
 
         if chats.isEmpty {
             let newChat = ChatThread()
             chats.append(newChat)
             selectedChatID = newChat.id
+            loadedChatID = newChat.id
         } else if wasSelected {
             selectedChatID = sortedChats.first?.id ?? chats.first?.id
+            do {
+                try loadSelectedChat()
+            } catch {
+                errorMessage = "Could not load selected chat."
+            }
         }
 
-        errorMessage = nil
+        unloadChats(except: selectedChatID)
         saveChats()
     }
 
@@ -581,6 +612,7 @@ final class AppState: ObservableObject {
         let chat = ChatThread()
         chats.append(chat)
         selectedChatID = chat.id
+        loadedChatID = chat.id
     }
 
     private func selectInitialChat() {
@@ -589,7 +621,28 @@ final class AppState: ObservableObject {
            chats.contains(where: { $0.id == savedID }) {
             selectedChatID = savedID
         } else {
-            selectedChatID = chats.first?.id
+            selectedChatID = sortedChats.first?.id ?? chats.first?.id
+        }
+    }
+
+    private func loadSelectedChat() throws {
+        guard let historyEncryptionKey, let selectedChatID else { return }
+        guard loadedChatID != selectedChatID else { return }
+
+        let loadedChat = try chatStore.loadThread(id: selectedChatID, key: historyEncryptionKey)
+        if let index = chats.firstIndex(where: { $0.id == selectedChatID }) {
+            chats[index] = loadedChat
+        } else {
+            chats.append(loadedChat)
+        }
+
+        loadedChatID = selectedChatID
+        unloadChats(except: selectedChatID)
+    }
+
+    private func unloadChats(except retainedChatID: UUID?) {
+        for index in chats.indices where chats[index].id != retainedChatID {
+            chats[index].messages = []
         }
     }
 
@@ -597,10 +650,23 @@ final class AppState: ObservableObject {
         guard historyAccessState == .unlocked, let historyEncryptionKey else { return }
 
         do {
-            try chatStore.saveEncrypted(chats, key: historyEncryptionKey)
+            if loadedChatID == selectedChatID, let currentChat {
+                try chatStore.saveThread(currentChat, key: historyEncryptionKey)
+            }
+            try chatStore.saveIndex(chats, key: historyEncryptionKey)
         } catch {
             assertionFailure("Could not save encrypted chats: \(error.localizedDescription)")
         }
+    }
+
+    private static func metadataThread(from chat: ChatThread) -> ChatThread {
+        ChatThread(
+            id: chat.id,
+            title: chat.title,
+            messages: [],
+            createdAt: chat.createdAt,
+            updatedAt: chat.updatedAt
+        )
     }
 
     private static func title(from prompt: String) -> String {
