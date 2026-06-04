@@ -32,10 +32,6 @@
         },
         {
           "kind" : "file",
-          "name" : "/Users/bedobenedek/dev/late/Sources/Late/CursorAgentController.swift"
-        },
-        {
-          "kind" : "file",
           "name" : "/Users/bedobenedek/dev/late/Sources/Late/HotKeyManager.swift"
         },
         {
@@ -73,7 +69,6 @@
       "objects" : [
         "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/AppState.swift.o",
         "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/ChatStore.swift.o",
-        "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/CursorAgentController.swift.o",
         "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/HotKeyManager.swift.o",
         "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/KeychainStore.swift.o",
         "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/LateApp.swift.o",
@@ -149,10 +144,6 @@
         },
         {
           "kind" : "file",
-          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/CursorAgentController.swift.o"
-        },
-        {
-          "kind" : "file",
           "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/HotKeyManager.swift.o"
         },
         {
@@ -184,7 +175,6 @@
       "sources" : [
         "/Users/bedobenedek/dev/late/Sources/Late/AppState.swift",
         "/Users/bedobenedek/dev/late/Sources/Late/ChatStore.swift",
-        "/Users/bedobenedek/dev/late/Sources/Late/CursorAgentController.swift",
         "/Users/bedobenedek/dev/late/Sources/Late/HotKeyManager.swift",
         "/Users/bedobenedek/dev/late/Sources/Late/KeychainStore.swift",
         "/Users/bedobenedek/dev/late/Sources/Late/LateApp.swift",
@@ -209,7 +199,6 @@
       "-c",
       "/Users/bedobenedek/dev/late/Sources/Late/AppState.swift",
       "/Users/bedobenedek/dev/late/Sources/Late/ChatStore.swift",
-      "/Users/bedobenedek/dev/late/Sources/Late/CursorAgentController.swift",
       "/Users/bedobenedek/dev/late/Sources/Late/HotKeyManager.swift",
       "/Users/bedobenedek/dev/late/Sources/Late/KeychainStore.swift",
       "/Users/bedobenedek/dev/late/Sources/Late/LateApp.swift",
@@ -324,10 +313,6 @@
         },
         {
           "kind" : "file",
-          "name" : "/Users/bedobenedek/dev/late/Sources/Late/CursorAgentController.swift"
-        },
-        {
-          "kind" : "file",
           "name" : "/Users/bedobenedek/dev/late/Sources/Late/HotKeyManager.swift"
         },
         {
@@ -367,10 +352,6 @@
         {
           "kind" : "file",
           "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/ChatStore.swift.o"
-        },
-        {
-          "kind" : "file",
-          "name" : "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/CursorAgentController.swift.o"
         },
         {
           "kind" : "file",

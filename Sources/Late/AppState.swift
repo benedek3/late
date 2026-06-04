@@ -202,7 +202,6 @@ final class AppState: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var isTranslationMode = false
-    @Published var isCursorAgentVisible = true
     @Published var translationInput = ""
     @Published var translationOutput = ""
     @Published var translationTargetLanguage = "English"

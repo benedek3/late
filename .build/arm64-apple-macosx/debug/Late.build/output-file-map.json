@@ -16,13 +16,6 @@
     "swift-dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/ChatStore.swiftdeps",
     "diagnostics": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/ChatStore.dia"
   },
-  "/Users/bedobenedek/dev/late/Sources/Late/CursorAgentController.swift": {
-    "dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/CursorAgentController.d",
-    "object": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/CursorAgentController.swift.o",
-    "swiftmodule": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/CursorAgentController~partial.swiftmodule",
-    "swift-dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/CursorAgentController.swiftdeps",
-    "diagnostics": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/CursorAgentController.dia"
-  },
   "/Users/bedobenedek/dev/late/Sources/Late/HotKeyManager.swift": {
     "dependencies": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/HotKeyManager.d",
     "object": "/Users/bedobenedek/dev/late/.build/arm64-apple-macosx/debug/Late.build/HotKeyManager.swift.o",

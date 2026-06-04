@@ -1,6 +1,5 @@
 import AppKit
 import Carbon.HIToolbox
-import Combine
 import SwiftUI
 
 @MainActor
@@ -8,14 +7,11 @@ final class StatusBarController: NSObject {
     private let statusItem: NSStatusItem
     private let panel: FloatingPanel
     private let appState: AppState
-    private let cursorAgentController: CursorAgentController
     private var localEventMonitor: Any?
-    private var cancellables = Set<AnyCancellable>()
 
     init(appState: AppState) {
         self.appState = appState
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        self.cursorAgentController = CursorAgentController(appState: appState)
         self.panel = FloatingPanel(
             contentRect: NSRect(x: 0, y: 0, width: 780, height: 620),
             styleMask: [.borderless, .fullSizeContentView],
@@ -45,7 +41,6 @@ final class StatusBarController: NSObject {
                 .environmentObject(appState)
         )
         installLocalShortcuts()
-        observeCursorAgentVisibility()
     }
 
     deinit {
@@ -119,15 +114,6 @@ final class StatusBarController: NSObject {
 
             return event
         }
-    }
-
-    private func observeCursorAgentVisibility() {
-        appState.$isCursorAgentVisible
-            .removeDuplicates()
-            .sink { [weak self] isVisible in
-                self?.cursorAgentController.setVisible(isVisible)
-            }
-            .store(in: &cancellables)
     }
 }
 
