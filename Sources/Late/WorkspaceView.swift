@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct WorkspaceView: View {
     @EnvironmentObject private var appState: AppState
@@ -10,10 +11,12 @@ struct WorkspaceView: View {
             Color.black.opacity(0.74)
 
             Group {
-                if appState.isConfigured {
-                    ChatView()
-                } else {
+                if !appState.isConfigured {
                     SetupView()
+                } else if appState.historyAccessState != .unlocked {
+                    HistoryAccessView()
+                } else {
+                    ChatView()
                 }
             }
         }
@@ -84,17 +87,123 @@ private struct SetupView: View {
     }
 }
 
+private struct HistoryAccessView: View {
+    @EnvironmentObject private var appState: AppState
+    @FocusState private var isPasswordFocused: Bool
+    @State private var password = ""
+    @State private var confirmation = ""
+
+    private var isSetup: Bool {
+        appState.historyAccessState == .setup
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(isSetup ? "Protect history" : "Unlock history")
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                Text(isSetup ? "Create a local password to encrypt your saved chats." : "Enter your local history password to load saved chats.")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("History Password")
+                    .font(.headline)
+                SecureField("Password", text: $password)
+                    .focused($isPasswordFocused)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                    .padding(14)
+                    .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
+                    )
+                    .onSubmit(submit)
+
+                if isSetup {
+                    SecureField("Confirm password", text: $confirmation)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 16, weight: .medium, design: .rounded))
+                        .padding(14)
+                        .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
+                        )
+                        .onSubmit(submit)
+                }
+
+                Text("Your password is not stored. Chat history is encrypted locally before it is written to disk.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let error = appState.errorMessage {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            Spacer()
+
+            HStack(spacing: 12) {
+                Label("Encrypted history", systemImage: "lock.shield")
+                Spacer()
+                Button(isSetup ? "Create Password" : "Unlock") {
+                    submit()
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.return, modifiers: [])
+                .disabled(isSubmitDisabled)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(30)
+        .onAppear {
+            isPasswordFocused = true
+        }
+    }
+
+    private var isSubmitDisabled: Bool {
+        if isSetup {
+            return password.isEmpty || confirmation.isEmpty
+        }
+
+        return password.isEmpty
+    }
+
+    private func submit() {
+        if isSetup {
+            appState.createHistoryPassword(password: password, confirmation: confirmation)
+        } else {
+            appState.unlockHistory(password: password)
+        }
+
+        if appState.historyAccessState == .unlocked {
+            password = ""
+            confirmation = ""
+        }
+    }
+}
+
 private struct ChatView: View {
     @EnvironmentObject private var appState: AppState
     @FocusState private var isPromptFocused: Bool
     @State private var isHistoryRevealHovered = false
     @State private var isSettingsPresented = false
     @State private var sendTask: Task<Void, Never>?
+    @State private var translationAutoTask: Task<Void, Never>?
+    @State private var isAutoTranslateEnabled = true
+    @State private var lastAutoTranslationKey = ""
+    @State private var pendingAttachments: [ChatAttachment] = []
 
     var body: some View {
         ZStack(alignment: .leading) {
             HStack(spacing: 0) {
-                if appState.isHistoryVisible {
+                if appState.isHistoryVisible && !appState.isTranslationMode {
                     chatList
                         .transition(.move(edge: .leading).combined(with: .opacity))
 
@@ -111,13 +220,17 @@ private struct ChatView: View {
                         .fill(Color.white.opacity(0.08))
                         .frame(height: 1)
 
-                    transcript
+                    if appState.isTranslationMode {
+                        translator
+                    } else {
+                        transcript
 
-                    composer
+                        composer
+                    }
                 }
             }
 
-            if !appState.isHistoryVisible {
+            if !appState.isHistoryVisible && !appState.isTranslationMode {
                 hiddenHistoryHandle
             }
         }
@@ -127,6 +240,20 @@ private struct ChatView: View {
         }
         .onChange(of: appState.focusToken) { _ in
             isPromptFocused = true
+        }
+        .onChange(of: appState.translationInput) { _ in
+            scheduleAutoTranslation()
+        }
+        .onChange(of: appState.translationTargetLanguage) { _ in
+            lastAutoTranslationKey = ""
+            scheduleAutoTranslation()
+        }
+        .onChange(of: appState.isTranslationMode) { isTranslationMode in
+            if isTranslationMode {
+                scheduleAutoTranslation()
+            } else {
+                translationAutoTask?.cancel()
+            }
         }
         .sheet(isPresented: $isSettingsPresented) {
             SettingsPanel()
@@ -244,12 +371,28 @@ private struct ChatView: View {
     private var header: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(appState.currentChat?.title ?? "New Chat")
+                Text(appState.isTranslationMode ? "Translator" : appState.currentChat?.title ?? "New Chat")
                     .font(.headline)
                     .lineLimit(1)
             }
 
             Spacer()
+
+            Button {
+                appState.toggleTranslationMode()
+                pendingAttachments.removeAll()
+            } label: {
+                Image(systemName: "character.book.closed")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(appState.isTranslationMode ? .black : .white)
+                    .frame(width: 30, height: 30)
+                    .background(appState.isTranslationMode ? Color.white : Color.white.opacity(0.12), in: Circle())
+                    .contentShape(Circle())
+            }
+            .help(appState.isTranslationMode ? "Back to chat" : "Translate")
+            .buttonStyle(.plain)
+            .keyboardShortcut("u", modifiers: .command)
+            .disabled(appState.isLoading)
 
             Button {
                 isSettingsPresented = true
@@ -322,6 +465,156 @@ private struct ChatView: View {
         }
     }
 
+    private var translator: some View {
+        VStack(spacing: 14) {
+            HStack(spacing: 14) {
+                translationPanel(title: "Source") {
+                    ZStack(alignment: .topLeading) {
+                        if appState.translationInput.isEmpty {
+                            Text("Text to translate")
+                                .font(.system(size: 15, weight: .regular, design: .rounded))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 8)
+                        }
+
+                        ScrollbarFreeTextView(text: $appState.translationInput)
+                            .focused($isPromptFocused)
+                    }
+                }
+
+                translationPanel(title: "Translation") {
+                    ScrollView(.vertical, showsIndicators: false) {
+                        if appState.translationOutput.isEmpty {
+                            Text(appState.isLoading ? "" : "Translated text")
+                                .font(.system(size: 15, weight: .regular, design: .rounded))
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 8)
+                        } else {
+                            Text(appState.translationOutput)
+                                .font(.system(size: 15, weight: .regular, design: .rounded))
+                                .lineSpacing(4)
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 8)
+                        }
+                    }
+                }
+            }
+
+            HStack(spacing: 12) {
+                Menu {
+                    ForEach(AppState.translationLanguages, id: \.self) { language in
+                        Button {
+                            appState.translationTargetLanguage = language
+                        } label: {
+                            if appState.translationTargetLanguage == language {
+                                Label(language, systemImage: "checkmark")
+                            } else {
+                                Text(language)
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(appState.translationTargetLanguage)
+                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundStyle(.secondary)
+                    .frame(height: 30)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(appState.isLoading)
+
+                Button {
+                    isAutoTranslateEnabled.toggle()
+                    if isAutoTranslateEnabled {
+                        scheduleAutoTranslation()
+                    } else {
+                        translationAutoTask?.cancel()
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("Auto")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    }
+                    .foregroundStyle(isAutoTranslateEnabled ? .black : .secondary)
+                    .padding(.horizontal, 8)
+                    .frame(height: 28)
+                    .background(isAutoTranslateEnabled ? Color.white : Color.white.opacity(0.08), in: Capsule())
+                    .contentShape(Capsule())
+                }
+                .help("Auto translate after typing")
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(appState.translationOutput, forType: .string)
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 30, height: 30)
+                        .background(Color.white.opacity(0.08), in: Circle())
+                        .contentShape(Circle())
+                }
+                .help("Copy translation")
+                .buttonStyle(.plain)
+                .disabled(appState.translationOutput.isEmpty)
+                .opacity(appState.translationOutput.isEmpty ? 0.35 : 1)
+
+                if appState.isLoading || !isAutoTranslateEnabled {
+                    Button {
+                        if appState.isLoading {
+                            sendTask?.cancel()
+                        } else {
+                            startTranslation()
+                        }
+                    } label: {
+                        Image(systemName: appState.isLoading ? "stop.fill" : "arrow.up")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(.black)
+                            .frame(width: 30, height: 30)
+                            .background(Color.white, in: Circle())
+                            .contentShape(Circle())
+                    }
+                    .help(appState.isLoading ? "Stop" : "Translate")
+                    .buttonStyle(.plain)
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .disabled(!appState.isLoading && appState.translationInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .opacity(!appState.isLoading && appState.translationInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.35 : 1)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background(Color.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+        .padding(24)
+    }
+
+    private func translationPanel<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+
+            content()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
     private var composer: some View {
         VStack(alignment: .leading, spacing: 10) {
             if let error = appState.errorMessage {
@@ -341,7 +634,44 @@ private struct ChatView: View {
                     .padding(.horizontal, 2)
                     .padding(.top, 6)
 
+                if !pendingAttachments.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(pendingAttachments) { attachment in
+                                AttachmentThumbnail(attachment: attachment) {
+                                    pendingAttachments.removeAll { $0.id == attachment.id }
+                                }
+                            }
+                        }
+                    }
+                    .frame(height: 58)
+                }
+
                 HStack(alignment: .center, spacing: 12) {
+                    Menu {
+                        Button {
+                            addFileAttachments()
+                        } label: {
+                            Label("Upload file", systemImage: "paperclip")
+                        }
+
+                        Button {
+                            addImageAttachments()
+                        } label: {
+                            Label("Upload image", systemImage: "photo")
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 18, weight: .regular))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 28, height: 28)
+                            .contentShape(Circle())
+                    }
+                    .help("Add upload")
+                    .buttonStyle(.plain)
+                    .disabled(appState.isLoading)
+                    .opacity(appState.isLoading ? 0.35 : 1)
+
                     Button {
                         appState.isWebSearchEnabled.toggle()
                     } label: {
@@ -391,8 +721,10 @@ private struct ChatView: View {
                         if appState.isLoading {
                             sendTask?.cancel()
                         } else {
+                            let attachments = pendingAttachments
+                            pendingAttachments = []
                             startStreaming {
-                                await appState.sendPrompt()
+                                await appState.sendPrompt(attachments: attachments)
                             }
                         }
                     } label: {
@@ -405,8 +737,8 @@ private struct ChatView: View {
                     }
                     .buttonStyle(.plain)
                     .keyboardShortcut(.return, modifiers: .command)
-                    .disabled(!appState.isLoading && appState.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .opacity(!appState.isLoading && appState.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.35 : 1)
+                    .disabled(!appState.isLoading && appState.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && pendingAttachments.isEmpty)
+                    .opacity(!appState.isLoading && appState.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && pendingAttachments.isEmpty ? 0.35 : 1)
                 }
             }
             .padding(.leading, 14)
@@ -423,6 +755,86 @@ private struct ChatView: View {
             .replacingOccurrences(of: "GPT-", with: "")
             .replacingOccurrences(of: "Claude ", with: "")
             .replacingOccurrences(of: "OpenRouter Auto", with: "Auto")
+    }
+
+    private func addImageAttachments() {
+        addAttachments(allowedContentTypes: [.image])
+    }
+
+    private func addFileAttachments() {
+        addAttachments(allowedContentTypes: nil)
+    }
+
+    private func addAttachments(allowedContentTypes: [UTType]?) {
+        let panel = NSOpenPanel()
+        if let allowedContentTypes {
+            panel.allowedContentTypes = allowedContentTypes
+        }
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+
+        guard panel.runModal() == .OK else { return }
+
+        let attachments = panel.urls.compactMap { url -> ChatAttachment? in
+            guard let data = try? Data(contentsOf: url),
+                  let attachmentMetadata = metadata(for: url) else {
+                return nil
+            }
+
+            let dataURL = "data:\(attachmentMetadata.mimeType);base64,\(data.base64EncodedString())"
+            return ChatAttachment(kind: attachmentMetadata.kind, name: url.lastPathComponent, mimeType: attachmentMetadata.mimeType, dataURL: dataURL)
+        }
+
+        pendingAttachments.append(contentsOf: attachments)
+    }
+
+    private func metadata(for url: URL) -> (kind: ChatAttachment.Kind, mimeType: String)? {
+        guard let type = UTType(filenameExtension: url.pathExtension) else {
+            return (.file, "application/octet-stream")
+        }
+
+        let kind: ChatAttachment.Kind = type.conforms(to: .image) ? .image : .file
+        return (kind, type.preferredMIMEType ?? "application/octet-stream")
+    }
+
+    private func scheduleAutoTranslation() {
+        translationAutoTask?.cancel()
+        guard appState.isTranslationMode, isAutoTranslateEnabled else { return }
+
+        let source = appState.translationInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !source.isEmpty else {
+            lastAutoTranslationKey = ""
+            return
+        }
+
+        let translationKey = "\(appState.translationTargetLanguage)\n\(source)"
+        guard translationKey != lastAutoTranslationKey else { return }
+
+        translationAutoTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 750_000_000)
+            guard !Task.isCancelled else { return }
+
+            let currentSource = appState.translationInput.trimmingCharacters(in: .whitespacesAndNewlines)
+            let currentKey = "\(appState.translationTargetLanguage)\n\(currentSource)"
+            guard !currentSource.isEmpty, currentKey == translationKey, currentKey != lastAutoTranslationKey else { return }
+
+            lastAutoTranslationKey = currentKey
+            if appState.isLoading {
+                sendTask?.cancel()
+                try? await Task.sleep(nanoseconds: 150_000_000)
+                guard !Task.isCancelled else { return }
+            }
+
+            startTranslation()
+        }
+    }
+
+    private func startTranslation() {
+        translationAutoTask?.cancel()
+        startStreaming {
+            await appState.translateText()
+        }
     }
 
     private func startStreaming(_ operation: @escaping @MainActor () async -> Void) {
@@ -522,6 +934,62 @@ private struct EmptyTranscriptView: View {
     }
 }
 
+private struct ScrollbarFreeTextView: NSViewRepresentable {
+    @Binding var text: String
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        scrollView.drawsBackground = false
+        scrollView.hasVerticalScroller = false
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.borderType = .noBorder
+
+        let textView = NSTextView()
+        textView.delegate = context.coordinator
+        textView.drawsBackground = false
+        textView.isRichText = false
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.textContainerInset = NSSize(width: 0, height: 8)
+        textView.font = NSFont.systemFont(ofSize: 15)
+        textView.textColor = .white
+        textView.insertionPointColor = .white
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.containerSize = NSSize(width: scrollView.contentSize.width, height: .greatestFiniteMagnitude)
+        textView.autoresizingMask = [.width]
+
+        scrollView.documentView = textView
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let textView = scrollView.documentView as? NSTextView,
+              textView.string != text else {
+            return
+        }
+
+        textView.string = text
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text)
+    }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        @Binding private var text: String
+
+        init(text: Binding<String>) {
+            self._text = text
+        }
+
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            text = textView.string
+        }
+    }
+}
+
 private struct MessageRow: View {
     let message: ChatMessage
     let showsActions: Bool
@@ -533,6 +1001,17 @@ private struct MessageRow: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(message.role == .user ? Color.accentColor : Color.secondary)
 
+            if !message.attachments.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(message.attachments) { attachment in
+                            AttachmentThumbnail(attachment: attachment)
+                        }
+                    }
+                }
+                .frame(height: 70)
+            }
+
             FormattedMessageText(message.content)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
@@ -542,18 +1021,27 @@ private struct MessageRow: View {
             }
 
             if showsActions {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
+                    if let modelName = message.modelName {
+                        Text(modelName)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
                     Button {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(message.content, forType: .string)
                     } label: {
-                        Label("Copy", systemImage: "doc.on.doc")
+                        Image(systemName: "doc.on.doc")
                     }
+                    .help("Copy")
                     .buttonStyle(MessageActionButtonStyle())
 
                     Button(action: onRetry) {
-                        Label("Try again", systemImage: "arrow.clockwise")
+                        Image(systemName: "arrow.clockwise")
                     }
+                    .help("Try again")
                     .buttonStyle(MessageActionButtonStyle())
                 }
                 .padding(.top, 2)
@@ -563,14 +1051,102 @@ private struct MessageRow: View {
     }
 }
 
+private struct AttachmentThumbnail: View {
+    let attachment: ChatAttachment
+    var onRemove: (() -> Void)?
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Group {
+                if let image = attachment.image {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    HStack(spacing: 7) {
+                        Image(systemName: attachment.fileIconName)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(attachment.name)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.white.opacity(0.86))
+                                .lineLimit(1)
+                            Text(attachment.fileExtensionLabel)
+                                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 8)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+            .frame(width: attachment.kind == .image ? 64 : 132, height: 56)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.16), lineWidth: 1)
+            )
+
+            if let onRemove {
+                Button(action: onRemove) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 16, height: 16)
+                        .background(Color.black.opacity(0.64), in: Circle())
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .offset(x: 5, y: -5)
+                .help("Remove attachment")
+            }
+        }
+        .help(attachment.name)
+    }
+}
+
+private extension ChatAttachment {
+    var image: NSImage? {
+        guard kind == .image else { return nil }
+        guard let base64 = dataURL.components(separatedBy: "base64,").last,
+              let data = Data(base64Encoded: base64) else {
+            return nil
+        }
+
+        return NSImage(data: data)
+    }
+
+    var fileIconName: String {
+        if mimeType == "application/pdf" {
+            return "doc.richtext"
+        }
+
+        if mimeType.hasPrefix("text/") {
+            return "doc.text"
+        }
+
+        return "doc"
+    }
+
+    var fileExtensionLabel: String {
+        let pathExtension = (name as NSString).pathExtension
+        guard !pathExtension.isEmpty else { return "FILE" }
+        return pathExtension.uppercased()
+    }
+}
+
 private struct MessageActionButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.caption.weight(.semibold))
             .foregroundStyle(.secondary)
-            .labelStyle(.titleAndIcon)
-            .padding(.horizontal, 9)
-            .frame(height: 28)
+            .frame(width: 28, height: 28)
             .background(Color.white.opacity(configuration.isPressed ? 0.16 : 0.08), in: Capsule())
             .contentShape(Capsule())
     }

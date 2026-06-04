@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 struct ModelOption: Identifiable, Hashable {
@@ -31,6 +32,12 @@ extension Notification.Name {
     static let appearanceShortcutDidChange = Notification.Name("appearanceShortcutDidChange")
 }
 
+enum HistoryAccessState: Equatable {
+    case setup
+    case locked
+    case unlocked
+}
+
 struct ChatSource: Identifiable, Codable, Equatable {
     let id: UUID
     let title: String?
@@ -56,19 +63,44 @@ struct ChatSource: Identifiable, Codable, Equatable {
     }
 }
 
+struct ChatAttachment: Identifiable, Codable, Equatable {
+    enum Kind: String, Codable {
+        case image
+        case file
+    }
+
+    let id: UUID
+    let kind: Kind
+    let name: String
+    let mimeType: String
+    let dataURL: String
+
+    init(id: UUID = UUID(), kind: Kind, name: String, mimeType: String, dataURL: String) {
+        self.id = id
+        self.kind = kind
+        self.name = name
+        self.mimeType = mimeType
+        self.dataURL = dataURL
+    }
+}
+
 struct ChatMessage: Identifiable, Codable, Equatable {
     let id: UUID
     let role: Role
     var content: String
     let createdAt: Date
     var sources: [ChatSource]
+    var modelName: String?
+    var attachments: [ChatAttachment]
 
-    init(id: UUID = UUID(), role: Role, content: String, createdAt: Date = Date(), sources: [ChatSource] = []) {
+    init(id: UUID = UUID(), role: Role, content: String, createdAt: Date = Date(), sources: [ChatSource] = [], modelName: String? = nil, attachments: [ChatAttachment] = []) {
         self.id = id
         self.role = role
         self.content = content
         self.createdAt = createdAt
         self.sources = sources
+        self.modelName = modelName
+        self.attachments = attachments
     }
 
     enum Role: String, Codable {
@@ -82,6 +114,8 @@ struct ChatMessage: Identifiable, Codable, Equatable {
         case content
         case createdAt
         case sources
+        case modelName
+        case attachments
     }
 
     init(from decoder: Decoder) throws {
@@ -91,6 +125,8 @@ struct ChatMessage: Identifiable, Codable, Equatable {
         self.content = try container.decode(String.self, forKey: .content)
         self.createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         self.sources = try container.decodeIfPresent([ChatSource].self, forKey: .sources) ?? []
+        self.modelName = try container.decodeIfPresent(String.self, forKey: .modelName)
+        self.attachments = try container.decodeIfPresent([ChatAttachment].self, forKey: .attachments) ?? []
     }
 }
 
@@ -121,6 +157,20 @@ final class AppState: ObservableObject {
         ModelOption(id: "anthropic/claude-opus-4.8", name: "Claude Opus 4.8"),
         ModelOption(id: "anthropic/claude-sonnet-4.8", name: "Claude Sonnet 4.8")
     ]
+    static let translationModelID = "openai/gpt-5.4-nano"
+    static let translationModelName = "GPT-5.4 Nano"
+    static let translationLanguages = [
+        "English",
+        "Hungarian",
+        "Spanish",
+        "French",
+        "German",
+        "Italian",
+        "Portuguese",
+        "Japanese",
+        "Korean",
+        "Chinese"
+    ]
 
     @Published var isConfigured: Bool
     @Published var setupAPIKey = ""
@@ -145,15 +195,21 @@ final class AppState: ObservableObject {
     }
     @Published var prompt = ""
     @Published var focusToken = 0
-    @Published var isHistoryVisible = true
+    @Published var isHistoryVisible = false
+    @Published var historyAccessState: HistoryAccessState = .locked
     @Published var isWebSearchEnabled = false
     @Published var settingsAPIKey = ""
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var isTranslationMode = false
+    @Published var translationInput = ""
+    @Published var translationOutput = ""
+    @Published var translationTargetLanguage = "English"
 
     private let keychain = KeychainStore()
     private let apiClient = OpenRouterClient()
     private let chatStore = ChatStore()
+    private var historyEncryptionKey: SymmetricKey?
     private let selectedModelKey = "selected-model"
     private let selectedChatIDKey = "selected-chat-id"
     private let selectedShortcutKey = "selected-shortcut"
@@ -183,19 +239,7 @@ final class AppState: ObservableObject {
         let savedShortcut = UserDefaults.standard.string(forKey: selectedShortcutKey)
         self.selectedShortcut = AppearanceShortcut(rawValue: savedShortcut ?? "") ?? .optionTab
         self.isConfigured = keychain.readAPIKey() != nil
-
-        let loadedChats = chatStore.load()
-        self.chats = loadedChats.isEmpty ? [ChatThread()] : loadedChats
-
-        if let savedIDString = UserDefaults.standard.string(forKey: selectedChatIDKey),
-           let savedID = UUID(uuidString: savedIDString),
-           self.chats.contains(where: { $0.id == savedID }) {
-            self.selectedChatID = savedID
-        } else {
-            self.selectedChatID = self.chats.first?.id
-        }
-
-        saveChats()
+        self.historyAccessState = chatStore.hasEncryptedStore ? .locked : .setup
     }
 
     func saveAPIKey() {
@@ -231,6 +275,52 @@ final class AppState: ObservableObject {
         errorMessage = nil
     }
 
+    func unlockHistory(password: String) {
+        guard !password.isEmpty else {
+            errorMessage = "Enter your history password."
+            return
+        }
+
+        do {
+            let result = try chatStore.unlock(password: password)
+            historyEncryptionKey = result.key
+            chats = result.chats.isEmpty ? [ChatThread()] : result.chats
+            selectInitialChat()
+            historyAccessState = .unlocked
+            errorMessage = nil
+            focusPrompt()
+        } catch {
+            errorMessage = "Could not unlock chat history. Check the password."
+        }
+    }
+
+    func createHistoryPassword(password: String, confirmation: String) {
+        guard password.count >= 8 else {
+            errorMessage = "Use at least 8 characters for the history password."
+            return
+        }
+
+        guard password == confirmation else {
+            errorMessage = "History passwords do not match."
+            return
+        }
+
+        do {
+            let migratedChats = chatStore.loadPlaintext()
+            let initialChats = migratedChats.isEmpty ? [ChatThread()] : migratedChats
+            let key = try chatStore.createEncryptedStore(chats: initialChats, password: password)
+            chatStore.deletePlaintextStore()
+            historyEncryptionKey = key
+            chats = initialChats
+            selectInitialChat()
+            historyAccessState = .unlocked
+            errorMessage = nil
+            focusPrompt()
+        } catch {
+            errorMessage = "Could not create encrypted chat history."
+        }
+    }
+
     func startNewChat() {
         let chat = ChatThread()
         chats.append(chat)
@@ -256,6 +346,12 @@ final class AppState: ObservableObject {
 
     func setHistoryVisible(_ isVisible: Bool) {
         isHistoryVisible = isVisible
+    }
+
+    func toggleTranslationMode() {
+        isTranslationMode.toggle()
+        errorMessage = nil
+        focusPrompt()
     }
 
     func clearCurrentChat() {
@@ -284,9 +380,9 @@ final class AppState: ObservableObject {
         saveChats()
     }
 
-    func sendPrompt() async {
+    func sendPrompt(attachments: [ChatAttachment] = []) async {
         let userPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !userPrompt.isEmpty, !isLoading else { return }
+        guard !userPrompt.isEmpty || !attachments.isEmpty, !isLoading else { return }
         guard let apiKey = keychain.readAPIKey(), !apiKey.isEmpty else {
             isConfigured = false
             return
@@ -301,7 +397,8 @@ final class AppState: ObservableObject {
             return
         }
 
-        chats[index].messages.append(ChatMessage(role: .user, content: userPrompt))
+        let messageContent = userPrompt.isEmpty ? "Uploaded attachment\(attachments.count == 1 ? "" : "s")" : userPrompt
+        chats[index].messages.append(ChatMessage(role: .user, content: messageContent, attachments: attachments))
         chats[index].updatedAt = Date()
 
         if chats[index].title == "New Chat" {
@@ -309,7 +406,8 @@ final class AppState: ObservableObject {
         }
 
         let assistantMessageID = UUID()
-        chats[index].messages.append(ChatMessage(id: assistantMessageID, role: .assistant, content: ""))
+        let responseModelName = selectedModelName
+        chats[index].messages.append(ChatMessage(id: assistantMessageID, role: .assistant, content: "", modelName: responseModelName))
 
         let requestChatID = chats[index].id
         let requestMessages = chats[index].messages
@@ -336,6 +434,7 @@ final class AppState: ObservableObject {
                let messageIndex = chats[chatIndex].messages.firstIndex(where: { $0.id == assistantMessageID }) {
                 chats[chatIndex].messages[messageIndex].content = reply.content
                 chats[chatIndex].messages[messageIndex].sources = reply.sources
+                chats[chatIndex].messages[messageIndex].modelName = responseModelName
                 chats[chatIndex].updatedAt = Date()
                 saveChats()
             }
@@ -382,7 +481,8 @@ final class AppState: ObservableObject {
         chats[index].updatedAt = Date()
 
         let assistantMessageID = UUID()
-        chats[index].messages.append(ChatMessage(id: assistantMessageID, role: .assistant, content: ""))
+        let responseModelName = selectedModelName
+        chats[index].messages.append(ChatMessage(id: assistantMessageID, role: .assistant, content: "", modelName: responseModelName))
 
         let requestChatID = chats[index].id
         let requestMessages = chats[index].messages.filter { $0.id != assistantMessageID }
@@ -409,6 +509,7 @@ final class AppState: ObservableObject {
                let messageIndex = chats[chatIndex].messages.firstIndex(where: { $0.id == assistantMessageID }) {
                 chats[chatIndex].messages[messageIndex].content = reply.content
                 chats[chatIndex].messages[messageIndex].sources = reply.sources
+                chats[chatIndex].messages[messageIndex].modelName = responseModelName
                 chats[chatIndex].updatedAt = Date()
                 saveChats()
             }
@@ -432,6 +533,43 @@ final class AppState: ObservableObject {
         isLoading = false
     }
 
+    func translateText() async {
+        let text = translationInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !isLoading else { return }
+        guard let apiKey = keychain.readAPIKey(), !apiKey.isEmpty else {
+            isConfigured = false
+            return
+        }
+
+        errorMessage = nil
+        translationOutput = ""
+        isLoading = true
+
+        do {
+            let reply = try await apiClient.streamReply(
+                apiKey: apiKey,
+                model: Self.translationModelID,
+                webSearchEnabled: false,
+                messages: [ChatMessage(role: .user, content: text)],
+                systemPrompt: Self.translationSystemPrompt(targetLanguage: translationTargetLanguage),
+                onContentDelta: { [weak self] delta in
+                    self?.translationOutput += delta
+                }
+            )
+            translationOutput = reply.content
+        } catch {
+            if error is CancellationError || (error as? URLError)?.code == .cancelled {
+                errorMessage = nil
+                isLoading = false
+                return
+            }
+
+            errorMessage = error.localizedDescription
+        }
+
+        isLoading = false
+    }
+
     private var selectedChatIndex: Array<ChatThread>.Index? {
         guard let selectedChatID else { return nil }
         return chats.firstIndex { $0.id == selectedChatID }
@@ -445,8 +583,24 @@ final class AppState: ObservableObject {
         selectedChatID = chat.id
     }
 
+    private func selectInitialChat() {
+        if let savedIDString = UserDefaults.standard.string(forKey: selectedChatIDKey),
+           let savedID = UUID(uuidString: savedIDString),
+           chats.contains(where: { $0.id == savedID }) {
+            selectedChatID = savedID
+        } else {
+            selectedChatID = chats.first?.id
+        }
+    }
+
     private func saveChats() {
-        chatStore.save(chats)
+        guard historyAccessState == .unlocked, let historyEncryptionKey else { return }
+
+        do {
+            try chatStore.saveEncrypted(chats, key: historyEncryptionKey)
+        } catch {
+            assertionFailure("Could not save encrypted chats: \(error.localizedDescription)")
+        }
     }
 
     private static func title(from prompt: String) -> String {
@@ -457,5 +611,11 @@ final class AppState: ObservableObject {
         let trimmed = firstLine.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count > 42 else { return trimmed.isEmpty ? "New Chat" : trimmed }
         return String(trimmed.prefix(39)) + "..."
+    }
+
+    private static func translationSystemPrompt(targetLanguage: String) -> String {
+        """
+        You are a translation engine. Translate the user's word, phrase, or sentences into \(targetLanguage). Return only the translated text. Do not answer questions, explain, summarize, transliterate unless needed, add quotation marks, add notes, add markdown, or include alternatives. Preserve line breaks, punctuation, names, numbers, and formatting as closely as possible.
+        """
     }
 }
